@@ -6,7 +6,7 @@ Version 1.1.3
 
 *(c) Gustav Brock, Cactus Data ApS, CPH*
 
-![General](https://raw.githubusercontent.com/GustavBrock/VBA.RowNumbers/master/images/EE RowNumbers.png)
+![General](https://raw.githubusercontent.com/GustavBrock/VBA.RowNumbers/master/images/EE%20RowNumbers.png)
 
 ### Enumeration of records and rows
 Set of functions to:
