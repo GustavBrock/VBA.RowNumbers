@@ -2,7 +2,7 @@ Attribute VB_Name = "RowEnumeration"
 Option Compare Database
 Option Explicit
 '
-' VBA.RowNumbers V1.1.0
+' VBA.RowNumbers V1.1.3
 ' (c) Gustav Brock, Cactus Data ApS, CPH
 ' https://github.com/GustavBrock/VBA.RowCount
 '
@@ -116,7 +116,7 @@ Err_RecordNumber:
 
 End Function
 
-' Builds consecutive row numbers in a select, append or create query
+' Builds consecutive row numbers in a select, append, or create query
 ' with the option of a initial automatic reset.
 ' Optionally, a grouping key can be passed to reset the row count
 ' for every group key.
@@ -136,7 +136,7 @@ End Function
 '
 ' Usage (typical append query, manual reset):
 ' 1. Reset counter manually:
-'   Call RowNumber(vbNullString)
+'   Call RowNumber(vbNullString, True)
 ' 2. Run query:
 '   INSERT INTO TempTable ( [RowID] )
 '   SELECT RowNumber(CStr([ID])) AS RowID, *
@@ -243,30 +243,64 @@ End Function
 '           RowPriority Me.Priority
 '       End Sub
 '
+'   and after inserting or deleting records:
+'
+'       Private Sub Form_AfterDelConfirm(Status As Integer)
+'           RowPriority Me.Priority
+'       End Sub
+'
+'       Private Sub Form_AfterInsert()
+'           RowPriority Me.Priority
+'       End Sub
+'
 '   Optionally, if the control holding the primary key is not named Id:
 '
 '       Private Sub Priority_AfterUpdate()
 '           RowPriority Me.Priority, NameOfPrimaryKeyControl
 '       End Sub
 '
-' 2018-08-27. Gustav Brock, Cactus Data ApS, CPH.
+'       Private Sub Form_AfterDelConfirm(Status As Integer)
+'           RowPriority Me.Priority, NameOfPrimaryKeyControl
+'       End Sub
+'
+'       Private Sub Form_AfterInsert()
+'           RowPriority Me.Priority, NameOfPrimaryKeyControl
+'       End Sub
+'
+' 2018-08-31. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Sub RowPriority( _
     ByRef TextBox As Access.TextBox, _
     Optional ByVal IdControlName As String = "Id")
-
-    Dim Form            As Access.Form
-    Dim Records         As DAO.Recordset
     
-    Dim RecordId        As Long
-    Dim NewPriority     As Long
-    Dim PriorityFix     As Long
-    Dim FieldName       As String
-    Dim IdFieldName     As String
+    ' Error codes.
+    ' This action is not supported in transactions.
+    Const NotSupported      As Long = 3246
+
+    Dim Form                As Access.Form
+    Dim Records             As DAO.Recordset
+    
+    Dim RecordId            As Long
+    Dim NewPriority         As Long
+    Dim PriorityFix         As Long
+    Dim FieldName           As String
+    Dim IdFieldName         As String
+    
+    Dim Prompt              As String
+    Dim Buttons             As VbMsgBoxStyle
+    Dim Title               As String
+    
+    On Error GoTo Err_RowPriority
     
     Set Form = TextBox.Parent
-    ' Save record.
-    Form.Dirty = False
+    
+    If Form.NewRecord Then
+        ' Will happen if the last record of the form is deleted.
+        Exit Sub
+    Else
+        ' Save record.
+        Form.Dirty = False
+    End If
     
     ' Priority control can have any Name.
     FieldName = TextBox.ControlSource
@@ -287,12 +321,17 @@ Public Sub RowPriority( _
         Form.Dirty = False
     End If
     
+    ' Disable a filter.
+    ' If a filter is applied, only the filtered records
+    ' will be reordered, and duplicates might be created.
+    Form.FilterOn = False
+    
     ' Rebuild priority list.
     Set Records = Form.RecordsetClone
     Records.MoveFirst
     While Not Records.EOF
         If Records.Fields(IdFieldName).Value <> RecordId Then
-        NewPriority = NewPriority + 1
+            NewPriority = NewPriority + 1
             If NewPriority = PriorityFix Then
                 ' Move this record to next lower priority.
                 NewPriority = NewPriority + 1
@@ -310,17 +349,42 @@ Public Sub RowPriority( _
     Wend
     
     ' Reorder form and relocate record position.
+    ' Will fail if more than one record is pasted in.
     Form.Requery
     Set Records = Form.RecordsetClone
     Records.FindFirst "[" & IdFieldName & "] = " & RecordId & ""
     Form.Bookmark = Records.Bookmark
    
+PreExit_RowPriority:
+    ' Enable a filter.
+    Form.FilterOn = True
     ' Present form.
     Form.Painting = True
     DoCmd.Hourglass False
     
     Set Records = Nothing
     Set Form = Nothing
+    
+Exit_RowPriority:
+    Exit Sub
+    
+Err_RowPriority:
+    Select Case Err.Number
+        Case NotSupported
+            ' Will happen if more than one record is pasted in.
+            Resume PreExit_RowPriority
+        Case Else
+            ' Unexpected error.
+            Prompt = "Error " & Err.Number & ": " & Err.Description
+            Buttons = vbCritical + vbOKOnly
+            Title = Form.Name
+            MsgBox Prompt, Buttons, Title
+            
+            ' Restore form.
+            Form.Painting = True
+            DoCmd.Hourglass False
+            Resume Exit_RowPriority
+    End Select
     
 End Sub
 
@@ -342,12 +406,12 @@ End Sub
 '
 Public Sub SetRowPriority(ByRef TextBox As Access.TextBox)
 
-    Const FirstNumber   As Long = 1
+    Const FirstNumber       As Long = 1
     
-    Dim Form            As Access.Form
-    Dim Records         As DAO.Recordset
+    Dim Form                As Access.Form
+    Dim Records             As DAO.Recordset
     
-    Dim FieldName       As String
+    Dim FieldName           As String
         
     Set Form = TextBox.Parent
     Set Records = Form.RecordsetClone
@@ -380,3 +444,145 @@ Public Sub SetRowPriority(ByRef TextBox As Access.TextBox)
 
 End Sub
 
+' Loop through a recordset and align the values of a priority field
+' to be valid and sequential.
+'
+' Default name for the priority field is Priority.
+' Another name can be specified in parameter FieldName.
+'
+' Typical usage:
+'   1.  Run code or query that updates, deletes, or appends records to
+'       a table holding a priority field.
+'
+'   2.  Open an updatable and sorted DAO recordset (Records) with the table:
+'
+'       Dim Records As DAO.Recordset
+'       Set Records = CurrentDb("Select * From Table Order By SomeField")
+
+'   3.  Call this function, passing it the recordset:
+'
+'       AlignPriority Records
+'
+' 2018-09-04. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Sub AlignPriority( _
+    ByRef Records As DAO.Recordset, _
+    Optional FieldName As String)
+
+    Const FirstNumber       As Long = 1
+    Const PriorityFieldName As String = "Priority"
+    
+    Dim Field               As DAO.Field
+    
+    Dim CurrentPriority     As Long
+    Dim NextPriority        As Long
+    
+    If FieldName = "" Then
+        FieldName = PriorityFieldName
+    End If
+    ' Verify that the field exists.
+    For Each Field In Records.Fields
+        If Field.Name = FieldName Then
+            Exit For
+        End If
+    Next
+    ' If FieldName is not present, exit silently.
+    If Field Is Nothing Then Exit Sub
+    
+    NextPriority = FirstNumber
+    ' Set each record's priority to match its current position as
+    ' defined by the sorting of the recordset.
+    Records.MoveFirst
+    While Not Records.EOF
+        CurrentPriority = Nz(Field.Value, 0)
+        If CurrentPriority = NextPriority Then
+            ' No update needed.
+        Else
+            ' Assign and save adjusted priority.
+            Records.Edit
+                Field.Value = NextPriority
+            Records.Update
+        End If
+        Records.MoveNext
+        NextPriority = NextPriority + 1
+    Wend
+    
+End Sub
+
+' Builds random row numbers in a select, append, or create query
+' with the option of a initial automatic reset.
+'
+' Usage (typical select query with random ordering):
+'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
+'   FROM SomeTable
+'   WHERE (RandomRowNumber(CStr([ID])) <> RandomRowNumber("",True))
+'   ORDER BY RandomRowNumber(CStr([ID]));
+'
+' The Where statement shuffles the sequence when the query is run.
+'
+' Usage (typical select query for a form with random ordering):
+'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
+'   FROM SomeTable
+'   ORDER BY RandomRowNumber(CStr([ID]));
+'
+' The RandomRowID values will resist reordering and refiltering of the form.
+' The sequence can be shuffled at will from, for example, a button click:
+'
+'   Private Sub ResetRandomButton_Click()
+'       RandomRowNumber vbNullString, True
+'       Me.Requery
+'   End Sub
+'
+' and erased each time the form is closed:
+'
+'   Private Sub Form_Close()
+'       RandomRowNumber vbNullString, True
+'   End Sub
+'
+' Usage (typical append query, manual reset):
+' 1. Reset random counter manually:
+'   Call RandomRowNumber(vbNullString, True)
+' 2. Run query:
+'   INSERT INTO TempTable ( [RandomRowID] )
+'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
+'   FROM SomeTable;
+'
+' Usage (typical append query, automatic reset):
+'   INSERT INTO TempTable ( [RandomRowID] )
+'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
+'   FROM SomeTable
+'   WHERE (RandomRowNumber("",True)=0);
+'
+' 2018-09-06. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Function RandomRowNumber( _
+    ByVal Key As String, _
+    Optional Reset As Boolean) _
+    As Single
+
+    Static Keys             As New Collection
+  
+    On Error GoTo Err_RandomRowNumber
+    
+    If Reset = True Then
+        Set Keys = Nothing
+    Else
+        Keys.Add Rnd(-Timer * Keys.Count), Key
+    End If
+    
+    RandomRowNumber = Keys(Key)
+    
+Exit_RandomRowNumber:
+    Exit Function
+    
+Err_RandomRowNumber:
+    Select Case Err
+        Case 457
+            ' Key is present.
+            Resume Next
+        Case Else
+            ' Some other error.
+            Resume Exit_RandomRowNumber
+    End Select
+
+End Function
