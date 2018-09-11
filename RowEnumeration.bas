@@ -2,7 +2,7 @@ Attribute VB_Name = "RowEnumeration"
 Option Compare Database
 Option Explicit
 '
-' VBA.RowNumbers V1.1.3
+' VBA.RowNumbers V1.1.4
 ' (c) Gustav Brock, Cactus Data ApS, CPH
 ' https://github.com/GustavBrock/VBA.RowCount
 '
@@ -553,13 +553,17 @@ End Sub
 '   FROM SomeTable
 '   WHERE (RandomRowNumber("",True)=0);
 '
-' 2018-09-06. Gustav Brock, Cactus Data ApS, CPH.
+' 2018-09-11. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Function RandomRowNumber( _
     ByVal Key As String, _
     Optional Reset As Boolean) _
     As Single
 
+    ' Error codes.
+    ' This key is already associated with an element of this collection.
+    Const KeyIsInUse        As Long = 457
+    
     Static Keys             As New Collection
   
     On Error GoTo Err_RandomRowNumber
@@ -577,7 +581,7 @@ Exit_RandomRowNumber:
     
 Err_RandomRowNumber:
     Select Case Err
-        Case 457
+        Case KeyIsInUse
             ' Key is present.
             Resume Next
         Case Else

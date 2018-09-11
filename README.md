@@ -2,7 +2,7 @@
 
 ## Enumeration of Records and Rows in Queries and Forms in *Microsoft Access*
 
-Version 1.1.3
+Version 1.1.4
 
 *(c) Gustav Brock, Cactus Data ApS, CPH*
 
@@ -146,5 +146,12 @@ A separate module contains some functions to demonstrate how to call the helper 
 A set of queries and forms are included in the *Microsoft Access 2016* project to demonstrate typical implementations of the functions.
 
 
+### Documentation
 
- 
+Detailed documentation is in-line. 
+
+Articles on the topic can be found here:
+
+![EE Logo](https://raw.githubusercontent.com/GustavBrock/VBA.RowNumbers/master/images/EE%20Logo.png)
+
+[Random Rows in Microsoft Access](https://www.experts-exchange.com/articles/33030/Random-Rows-in-Microsoft-Access.html)
