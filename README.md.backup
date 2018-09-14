@@ -2,7 +2,7 @@
 
 ## Enumeration of Records and Rows in Queries and Forms in *Microsoft Access*
 
-Version 1.1.3
+Version 1.2.0
 
 *(c) Gustav Brock, Cactus Data ApS, CPH*
 
@@ -155,3 +155,5 @@ Articles on the topic can be found here:
 ![EE Logo](https://raw.githubusercontent.com/GustavBrock/VBA.RowNumbers/master/images/EE%20Logo.png)
 
 [Random Rows in Microsoft Access](https://www.experts-exchange.com/articles/33030/Random-Rows-in-Microsoft-Access.html)
+
+[Sequential Rows in Microsoft Access](https://www.experts-exchange.com/articles/33069/Sequential-Rows-in-Microsoft-Access.html)

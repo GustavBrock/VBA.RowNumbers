@@ -2,13 +2,95 @@ Attribute VB_Name = "RowEnumeration"
 Option Compare Database
 Option Explicit
 '
-' VBA.RowNumbers V1.1.4
+' VBA.RowNumbers V1.2.0
 ' (c) Gustav Brock, Cactus Data ApS, CPH
 ' https://github.com/GustavBrock/VBA.RowCount
 '
 ' Functions for enumaration of records in queries and forms,
 ' either stored or created on the fly.
 '
+
+' Builds random row numbers in a select, append, or create query
+' with the option of a initial automatic reset.
+'
+' Usage (typical select query with random ordering):
+'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
+'   FROM SomeTable
+'   WHERE (RandomRowNumber(CStr([ID])) <> RandomRowNumber("",True))
+'   ORDER BY RandomRowNumber(CStr([ID]));
+'
+' The Where statement shuffles the sequence when the query is run.
+'
+' Usage (typical select query for a form with random ordering):
+'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
+'   FROM SomeTable
+'   ORDER BY RandomRowNumber(CStr([ID]));
+'
+' The RandomRowID values will resist reordering and refiltering of the form.
+' The sequence can be shuffled at will from, for example, a button click:
+'
+'   Private Sub ResetRandomButton_Click()
+'       RandomRowNumber vbNullString, True
+'       Me.Requery
+'   End Sub
+'
+' and erased each time the form is closed:
+'
+'   Private Sub Form_Close()
+'       RandomRowNumber vbNullString, True
+'   End Sub
+'
+' Usage (typical append query, manual reset):
+' 1. Reset random counter manually:
+'   Call RandomRowNumber(vbNullString, True)
+' 2. Run query:
+'   INSERT INTO TempTable ( [RandomRowID] )
+'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
+'   FROM SomeTable;
+'
+' Usage (typical append query, automatic reset):
+'   INSERT INTO TempTable ( [RandomRowID] )
+'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
+'   FROM SomeTable
+'   WHERE (RandomRowNumber("",True)=0);
+'
+' 2018-09-11. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Function RandomRowNumber( _
+    ByVal Key As String, _
+    Optional Reset As Boolean) _
+    As Single
+
+    ' Error codes.
+    ' This key is already associated with an element of this collection.
+    Const KeyIsInUse        As Long = 457
+    
+    Static Keys             As New Collection
+  
+    On Error GoTo Err_RandomRowNumber
+    
+    If Reset = True Then
+        Set Keys = Nothing
+    Else
+        Keys.Add Rnd(-Timer * Keys.Count), Key
+    End If
+    
+    RandomRowNumber = Keys(Key)
+    
+Exit_RandomRowNumber:
+    Exit Function
+    
+Err_RandomRowNumber:
+    Select Case Err
+        Case KeyIsInUse
+            ' Key is present.
+            Resume Next
+        Case Else
+            ' Some other error.
+            Resume Exit_RandomRowNumber
+    End Select
+
+End Function
 
 ' Creates and returns a sequential record number for records displayed
 ' in a form, even if no primary or unique key is present.
@@ -62,7 +144,7 @@ Option Explicit
 '   Number = RecordNumber(Forms("NameOfSomeOpenForm"))
 '
 '
-' 2018-08-23. Gustav Brock, Cactus Data ApS, CPH.
+' 2018-09-14. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Function RecordNumber( _
     ByRef Form As Access.Form, _
@@ -85,6 +167,9 @@ Public Function RecordNumber( _
         Number = Null
     ElseIf Form.Dirty = True Then
         ' No record number until the record is saved.
+        Number = Null
+    ElseIf Form.NewRecord = True Then
+        ' No record number on a new record.
         Number = Null
     Else
         Set Records = Form.RecordsetClone
@@ -113,6 +198,71 @@ Err_RecordNumber:
     ' Return Null for any error.
     Number = Null
     Resume Exit_RecordNumber
+
+End Function
+
+' Returns the count of records in form Form.
+'
+' Implementation, typical:
+'
+'   Create a TextBox to display the record count.
+'   Set the ControlSource of this to:
+'
+'       =RecordCount([Form])
+'
+'   NB: For localised versions of Access, when entering the expression, type
+'
+'       =RecordCount([LocalisedNameOfObjectForm])
+'
+'   for example:
+'
+'       =RecordCount([Formular])
+'
+'   and press Enter. The expression will update to:
+'
+'       =RecordCount([Form])
+'
+'   If the form can delete records, insert this code line in the
+'   AfterDelConfirm event:
+'
+'       Private Sub Form_AfterDelConfirm(Status As Integer)
+'           Me!RecordCount.Requery
+'       End Sub
+'
+'
+'   If the form can add records, insert this code line in the
+'   AfterInsert and OnCurrent events respectively:
+'
+'       Private Sub Form_AfterInsert()
+'           Me!RecordCount.Requery
+'       End Sub
+'
+'       Private Sub Form_Current()'
+'           Static NewRecord    As Boolean
+'
+'           If NewRecord <> Me.NewRecord Then
+'               Me!RecordCount.Requery
+'               NewRecord = Me.NewRecord
+'           End If
+'       End Sub
+'
+' 2018-09-14. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Function RecordCount( _
+    ByRef Form As Access.Form) _
+    As Long
+
+    Dim Records As DAO.Recordset
+    Dim Count   As Long
+
+    Set Records = Form.RecordsetClone
+    If Not Records.EOF Then
+        Records.MoveLast
+    End If
+    Count = Records.RecordCount + Abs(Form.NewRecord)
+    Records.Close
+
+    RecordCount = Count
 
 End Function
 
@@ -509,84 +659,3 @@ Public Sub AlignPriority( _
     
 End Sub
 
-' Builds random row numbers in a select, append, or create query
-' with the option of a initial automatic reset.
-'
-' Usage (typical select query with random ordering):
-'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
-'   FROM SomeTable
-'   WHERE (RandomRowNumber(CStr([ID])) <> RandomRowNumber("",True))
-'   ORDER BY RandomRowNumber(CStr([ID]));
-'
-' The Where statement shuffles the sequence when the query is run.
-'
-' Usage (typical select query for a form with random ordering):
-'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
-'   FROM SomeTable
-'   ORDER BY RandomRowNumber(CStr([ID]));
-'
-' The RandomRowID values will resist reordering and refiltering of the form.
-' The sequence can be shuffled at will from, for example, a button click:
-'
-'   Private Sub ResetRandomButton_Click()
-'       RandomRowNumber vbNullString, True
-'       Me.Requery
-'   End Sub
-'
-' and erased each time the form is closed:
-'
-'   Private Sub Form_Close()
-'       RandomRowNumber vbNullString, True
-'   End Sub
-'
-' Usage (typical append query, manual reset):
-' 1. Reset random counter manually:
-'   Call RandomRowNumber(vbNullString, True)
-' 2. Run query:
-'   INSERT INTO TempTable ( [RandomRowID] )
-'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
-'   FROM SomeTable;
-'
-' Usage (typical append query, automatic reset):
-'   INSERT INTO TempTable ( [RandomRowID] )
-'   SELECT RandomRowNumber(CStr([ID])) AS RandomRowID, *
-'   FROM SomeTable
-'   WHERE (RandomRowNumber("",True)=0);
-'
-' 2018-09-11. Gustav Brock, Cactus Data ApS, CPH.
-'
-Public Function RandomRowNumber( _
-    ByVal Key As String, _
-    Optional Reset As Boolean) _
-    As Single
-
-    ' Error codes.
-    ' This key is already associated with an element of this collection.
-    Const KeyIsInUse        As Long = 457
-    
-    Static Keys             As New Collection
-  
-    On Error GoTo Err_RandomRowNumber
-    
-    If Reset = True Then
-        Set Keys = Nothing
-    Else
-        Keys.Add Rnd(-Timer * Keys.Count), Key
-    End If
-    
-    RandomRowNumber = Keys(Key)
-    
-Exit_RandomRowNumber:
-    Exit Function
-    
-Err_RandomRowNumber:
-    Select Case Err
-        Case KeyIsInUse
-            ' Key is present.
-            Resume Next
-        Case Else
-            ' Some other error.
-            Resume Exit_RandomRowNumber
-    End Select
-
-End Function
