@@ -2,7 +2,7 @@ Attribute VB_Name = "RowEnumeration"
 Option Compare Database
 Option Explicit
 '
-' VBA.RowNumbers V1.2.0
+' VBA.RowNumbers V1.3.0
 ' (c) Gustav Brock, Cactus Data ApS, CPH
 ' https://github.com/GustavBrock/VBA.RowCount
 '
@@ -658,4 +658,77 @@ Public Sub AlignPriority( _
     Wend
     
 End Sub
+
+Public Function RecordRank( _
+    ByRef Field As Access.TextBox, _
+    Optional ByVal Average As Boolean) _
+    As Double
+    
+    ' Duration in seconds to keep form's records cached.
+    Const CachePause    As Integer = 10
+
+    Static AllRecords   As DAO.Recordset
+    Static LastRead     As Date
+    
+    Dim FilteredRecords As DAO.Recordset
+    
+    Dim FieldName       As String
+    Dim FieldValue      As Variant
+    Dim Rank            As Double
+    Dim Entries         As Long
+    
+    If DateDiff("s", LastRead, Now) > CachePause Then
+        ' Read or refresh AllRecords from the form's records.
+        Set AllRecords = CurrentDb.OpenRecordset(Field.Parent.RecordSource, dbOpenDynaset)
+        ' Set duration until refresh.
+        LastRead = Now
+    End If
+    
+    ' The field to rank on.
+    FieldName = "[" & Field.ControlSource & "]"
+    
+    If Not IsNumeric(Field.Value) Then
+        ' Don't rank Null or non-numeric values.
+        ' Set a bottom rank.
+        Rank = AllRecords.RecordCount
+    Else
+        ' Convert numeric value to invariant string expression.
+        FieldValue = Str(Field.Value)
+        
+        ' Filter for those records ranked higher than the current record.
+        AllRecords.Filter = FieldName & " > " & FieldValue
+        
+        ' Create filtered recordset.
+        Set FilteredRecords = AllRecords.OpenRecordset()
+        If Not FilteredRecords.EOF Then
+            ' Records with lower rank exists.
+            FilteredRecords.MoveLast
+        End If
+        ' Add 1 to record count, as the highest rank should be 1, not 0 (zero).
+        Rank = 1 + FilteredRecords.RecordCount
+        
+        If Average = True Then
+            ' An average rank is requested.
+            
+            ' Filter for those records ranked equally to the current record.
+            AllRecords.Filter = FieldName & " = " & FieldValue
+            
+            ' Create filtered recordset.
+            Set FilteredRecords = AllRecords.OpenRecordset
+            ' Move to the last record to obtain the true count of records.
+            FilteredRecords.MoveLast
+            Entries = FilteredRecords.RecordCount
+            
+            If Entries > 1 Then
+                ' More than one record of the current rank exists.
+                ' Calculate the average rank for these.
+                Rank = (Rank + (Rank + Entries - 1)) / 2
+            End If
+        End If
+    End If
+    
+    ' Return the rank for this record.
+    RecordRank = Rank
+
+End Function
 
