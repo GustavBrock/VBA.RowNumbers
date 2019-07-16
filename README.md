@@ -36,6 +36,7 @@ The difference is *how* and *when*, and - if the records are supposed to be upda
 The functions listed here offer five methods, each having some characteristic advantages and disadvantages:
 
 <br>
+
 #### 1. Record Numbers
 These are similar to the *Record Number* displayed in the *Navigation Bar* of a form (left-bottom, in the status bar of the form).
 
@@ -55,6 +56,7 @@ These are similar to the *Record Number* displayed in the *Navigation Bar* of a 
 > For forms only, not queries.
 
 <br>
+
 #### 2. Row Numbers
 These are created in a query, as a separate field of the resulting recordset.
 
@@ -75,6 +77,7 @@ These are created in a query, as a separate field of the resulting recordset.
 >If used in a form, and different filtering or sorting is applied, there is no method to reqain sequentiality other than to revert to the original ordering and remove filtering.
 
 <br>
+
 #### 3. Priority Numbers
 These are stored in a separate numeric field of the table. Thus, they are persistent, and primarily intended to be maintained by a user having the records listed in a form.
 
@@ -93,6 +96,7 @@ These are stored in a separate numeric field of the table. Thus, they are persis
 >If records can be inserted or deleted from sources not maintaining the sequentiality of the numbers, this will be broken. However, sequentiality can be restored by a call to the function *AlignPriority*.
 
 <br> 
+
 #### 4. Random Row Numbers
 These are pseudo-random numbers assigned each record in a query, as a separate field of the resulting recordset. The typical purpose is to sort on these, selecting a specific (small) count of random records from a (large) recordset. 
 
@@ -113,13 +117,13 @@ For this purpose, a query must be used to generate the numbers; if the numbers a
 >Must be implemented in a query to be useful.
 
 <br>
+
 #### 5. Rank
 The principle of ranking is not difficult to understand, but one topic complicates matters: *Dupes*.<br>
 If any two or more of the values are equal, we must have clear guidelines prepared:
 
->How should the dupes be ranked?
->
->How should the dupes influence the ranking of the succeeding values?
+- How should the dupes be ranked?
+- How should the dupes influence the ranking of the succeeding values?
 
 Ranking values, taken this into account, can be done using any of five common methods also called strategies.<br>
 Also, the values to rank can be ordered ascending or descending. The default is descending, meaning that the highest values are assigned the highest (numerically lowest) ranks. However, ascending is also common and is what is used for "smallest is best" measures like time to run 100 m or fuel consumed per distance unit.
@@ -141,6 +145,7 @@ The *RowRank* function supports these five strategies (methods):
 A detailed explanation for each can be found on *WikiPedia*: [Ranking](https://en.wikipedia.org/wiki/Ranking).
 
 <br>
+
 #### 6. No-Code Row Counter
 This is a simple counter using an expression with *DCount* that - for each record - counts the records having a unique key equal to the current key or lower.
 
@@ -155,6 +160,7 @@ This is a simple counter using an expression with *DCount* that - for each recor
 >As the number is calculated for each record visible in the form, browsing can be slow, indeed for large recordset.
 
 <br>
+
 #### 7. No-Code Random Number
 This is a simple pseudo-random number generator using an expression with *Rnd* that assigns a pseudo-random number to each record. However, these are *delicate* and will be regenerated whenever the form or query is requeried, or sorting or filtering is changed.
 
@@ -169,6 +175,7 @@ This is a simple pseudo-random number generator using an expression with *Rnd* t
 >Cannot be sorted in a form.
 
 <br>
+
 #### 8. No-Code Ranking
 
 ***Advantages***
@@ -180,6 +187,7 @@ This is a simple pseudo-random number generator using an expression with *Rnd* t
 >Slow for large recordsets.
 
 <br>
+
 ### Code
 
 All code is contained in one module: *RowEnumeration*
