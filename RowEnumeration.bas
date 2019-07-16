@@ -2,13 +2,30 @@ Attribute VB_Name = "RowEnumeration"
 Option Compare Database
 Option Explicit
 '
-' VBA.RowNumbers V1.3.0
+' VBA.RowNumbers V1.4.1
 ' (c) Gustav Brock, Cactus Data ApS, CPH
 ' https://github.com/GustavBrock/VBA.RowCount
 '
-' Functions for enumaration of records in queries and forms,
+' Functions for enumeration of records in queries and forms,
 ' either stored or created on the fly.
-'
+
+' Enumerations.
+
+'   Ranking strategies. Numeric values match those of:
+'   https://se.mathworks.com/matlabcentral/fileexchange/70301-ranknum
+Public Enum ApRankingStrategy
+    apDense = 1
+    apOrdinal = 2
+    apStandardCompetition = 3
+    apModifiedCompetition = 4
+    apFractional = 5
+End Enum
+
+'   Ranking orders.
+Public Enum ApRankingOrder
+    apDescending = 0
+    apAscending = 1
+End Enum
 
 ' Builds random row numbers in a select, append, or create query
 ' with the option of a initial automatic reset.
@@ -659,76 +676,221 @@ Public Sub AlignPriority( _
     
 End Sub
 
-Public Function RecordRank( _
-    ByRef Field As Access.TextBox, _
-    Optional ByVal Average As Boolean) _
+' Returns, by the value of a field, the rank of one or more records of a table or query.
+' Supports all five common ranking strategies (methods).
+'
+' Source:
+'   WikiPedia: https://en.wikipedia.org/wiki/Ranking
+'
+' Supports ranking of descending as well as ascending values.
+' Any ranking will require one table scan only.
+' For strategy Ordinal, a a second field with a subvalue must be used.
+'
+' Typical usage (table Products of Northwind sample database):
+'
+'   SELECT Products.*, RowRank("[Standard Cost]","[Products]",[Standard Cost]) AS Rank
+'   FROM Products
+'   ORDER BY Products.[Standard Cost] DESC;
+'
+' Typical usage for strategy Ordinal with a second field ([Product Code]) holding the subvalues:
+'
+'   SELECT Products.*, RowRank("[Standard Cost],[Product Code]","[Products]",[Standard Cost],[Product Code],2) AS Ordinal
+'   FROM Products
+'   ORDER BY Products.[Standard Cost] DESC;
+'
+' To obtain a rank, the first three parameters must be passed.
+' Four parameters is required for strategy Ordinal to be returned properly.
+' The remaining parameters are optional.
+'
+' The ranking will be cached until Order is changed or RowRank is called to clear the cache.
+' To clear the cache, call RowRank with no parameters:
+'
+'   RowRank
+'
+' Parameters:
+'
+'   Expression: One field name for other strategies than Ordinal, two field names for this.
+'   Domain:     Table or query name.
+'   Value:      The values to rank.
+'   SubValue:   The subvalues to rank when using strategy Ordinal.
+'   Strategy:   Strategy for the ranking.
+'   Order:      The order by which to rank the values (and subvalues).
+'
+' 2019-07-11. Gustav Brock, Cactus Data ApS, CPH.
+'
+Public Function RowRank( _
+    Optional ByVal Expression As String, _
+    Optional ByVal Domain As String, _
+    Optional ByVal Value As Variant, _
+    Optional ByVal SubValue As Variant, _
+    Optional ByVal Strategy As ApRankingStrategy = ApRankingStrategy.apStandardCompetition, _
+    Optional ByVal Order As ApRankingOrder = ApRankingOrder.apDescending) _
     As Double
     
-    ' Duration in seconds to keep form's records cached.
-    Const CachePause    As Integer = 10
+    Const SqlMask1          As String = "Select Top 1 {0} From {1}"
+    Const SqlMask           As String = "Select {0} From {1} Order By 1 {2}"
+    Const SqlOrder          As String = ",{0} {1}"
+    Const OrderAsc          As String = "Asc"
+    Const OrderDesc         As String = "Desc"
+    Const FirstStrategy     As Integer = ApRankingStrategy.apDense
+    Const LastStrategy      As Integer = ApRankingStrategy.apFractional
+    
+    ' Expected error codes to accept.
+    Const CannotAddKey      As Long = 457
+    Const CannotFindKey     As Long = 5
+    ' Uncommon character string to assemble Key and SubKey as a compound key.
+    Const KeySeparator      As String = "¤§¤"
+    
+    ' Array of the collections for the five strategies.
+    Static Ranks(FirstStrategy To LastStrategy) As Collection
+    ' The last sort order used.
+    Static LastOrder        As ApRankingOrder
 
-    Static AllRecords   As DAO.Recordset
-    Static LastRead     As Date
+    Dim Records             As DAO.Recordset
     
-    Dim FilteredRecords As DAO.Recordset
+    ' Array to hold the rank for each strategy.
+    Dim Rank(FirstStrategy To LastStrategy)     As Double
     
-    Dim FieldName       As String
-    Dim FieldValue      As Variant
-    Dim Rank            As Double
-    Dim Entries         As Long
+    Dim Item                As Integer
+    Dim Sql                 As String
+    Dim SortCount           As Integer
+    Dim SortOrder           As String
+    Dim LastKey             As String
+    Dim Key                 As String
+    Dim SubKey              As String
+    Dim Dupes               As Integer
+    Dim Delta               As Long
+    Dim ThisStrategy        As ApRankingStrategy
+
+    On Error GoTo Err_RowRank
     
-    If DateDiff("s", LastRead, Now) > CachePause Then
-        ' Read or refresh AllRecords from the form's records.
-        Set AllRecords = CurrentDb.OpenRecordset(Field.Parent.RecordSource, dbOpenDynaset)
-        ' Set duration until refresh.
-        LastRead = Now
-    End If
-    
-    ' The field to rank on.
-    FieldName = "[" & Field.ControlSource & "]"
-    
-    If Not IsNumeric(Field.Value) Then
-        ' Don't rank Null or non-numeric values.
-        ' Set a bottom rank.
-        Rank = AllRecords.RecordCount
+    If Expression = "" Then
+        ' Erase the collections of keys.
+        For Item = LBound(Ranks) To UBound(Ranks)
+            Set Ranks(Item) = Nothing
+        Next
     Else
-        ' Convert numeric value to invariant string expression.
-        FieldValue = Str(Field.Value)
-        
-        ' Filter for those records ranked higher than the current record.
-        AllRecords.Filter = FieldName & " > " & FieldValue
-        
-        ' Create filtered recordset.
-        Set FilteredRecords = AllRecords.OpenRecordset()
-        If Not FilteredRecords.EOF Then
-            ' Records with lower rank exists.
-            FilteredRecords.MoveLast
-        End If
-        ' Add 1 to record count, as the highest rank should be 1, not 0 (zero).
-        Rank = 1 + FilteredRecords.RecordCount
-        
-        If Average = True Then
-            ' An average rank is requested.
+        If LastOrder <> Order Or Ranks(FirstStrategy) Is Nothing Then
+            ' Initialize the collections and reset their ranks.
+            For Item = LBound(Ranks) To UBound(Ranks)
+                Set Ranks(Item) = New Collection
+                Rank(Item) = 0
+            Next
             
-            ' Filter for those records ranked equally to the current record.
-            AllRecords.Filter = FieldName & " = " & FieldValue
+            ' Build order clause.
+            Sql = Replace(Replace(SqlMask1, "{0}", Expression), "{1}", Domain)
+            SortCount = CurrentDb.OpenRecordset(Sql, dbReadOnly).Fields.Count
             
-            ' Create filtered recordset.
-            Set FilteredRecords = AllRecords.OpenRecordset
-            ' Move to the last record to obtain the true count of records.
-            FilteredRecords.MoveLast
-            Entries = FilteredRecords.RecordCount
-            
-            If Entries > 1 Then
-                ' More than one record of the current rank exists.
-                ' Calculate the average rank for these.
-                Rank = (Rank + (Rank + Entries - 1)) / 2
+            If Order = ApRankingOrder.apDescending Then
+                ' Descending sorting (default).
+                SortOrder = OrderDesc
+            Else
+                ' Ascending sorting.
+                SortOrder = OrderAsc
             End If
+            LastOrder = Order
+            
+            ' Build SQL.
+            Sql = Replace(Replace(Replace(SqlMask, "{0}", Expression), "{1}", Domain), "{2}", SortOrder)
+            ' Add a second sort field, if present.
+            If SortCount >= 2 Then
+                Sql = Sql & Replace(Replace(SqlOrder, "{0}", 2), "{1}", SortOrder)
+            End If
+
+            ' Open ordered recordset.
+            Set Records = CurrentDb.OpenRecordset(Sql, dbReadOnly)
+            ' Loop the recordset once while creating all the collections of ranks.
+            While Not Records.EOF
+                Key = CStr(Nz(Records.Fields(0).Value))
+                SubKey = ""
+                ' Create the sub key if a second field is present.
+                If SortCount > 1 Then
+                    SubKey = CStr(Nz(Records.Fields(1).Value))
+                End If
+                
+                If LastKey <> Key Then
+                    ' Add new entries.
+                    For ThisStrategy = FirstStrategy To LastStrategy
+                        Select Case ThisStrategy
+                            Case ApRankingStrategy.apDense
+                                Rank(ThisStrategy) = Rank(ThisStrategy) + 1
+                            Case ApRankingStrategy.apStandardCompetition
+                                Rank(ThisStrategy) = Rank(ThisStrategy) + 1 + Dupes
+                                Dupes = 0
+                            Case ApRankingStrategy.apModifiedCompetition
+                                Rank(ThisStrategy) = Rank(ThisStrategy) + 1
+                            Case ApRankingStrategy.apOrdinal
+                                Rank(ThisStrategy) = Rank(ThisStrategy) + 1
+                                ' Add entry using both Key and SubKey
+                                Ranks(ThisStrategy).Add Rank(ThisStrategy), Key & KeySeparator & SubKey
+                            Case ApRankingStrategy.apFractional
+                                Rank(ThisStrategy) = Rank(ThisStrategy) + 1 + Delta / 2
+                                Delta = 0
+                        End Select
+                        If ThisStrategy = ApRankingStrategy.apOrdinal Then
+                            ' Key with SubKey has been added above for this strategy.
+                        Else
+                            ' Add key for all other strategies.
+                            Ranks(ThisStrategy).Add Rank(ThisStrategy), Key
+                        End If
+                    Next
+                    LastKey = Key
+                Else
+                    ' Modify entries and/or counters for those strategies that require this for a repeated key.
+                    For ThisStrategy = FirstStrategy To LastStrategy
+                        Select Case ThisStrategy
+                            Case ApRankingStrategy.apDense
+                            Case ApRankingStrategy.apStandardCompetition
+                                Dupes = Dupes + 1
+                            Case ApRankingStrategy.apModifiedCompetition
+                                Rank(ThisStrategy) = Rank(ThisStrategy) + 1
+                                Ranks(ThisStrategy).Remove Key
+                                Ranks(ThisStrategy).Add Rank(ThisStrategy), Key
+                            Case ApRankingStrategy.apOrdinal
+                                Rank(ThisStrategy) = Rank(ThisStrategy) + 1
+                                ' Will fail for a repeated value of SubKey.
+                                Ranks(ThisStrategy).Add Rank(ThisStrategy), Key & KeySeparator & SubKey
+                            Case ApRankingStrategy.apFractional
+                                Rank(ThisStrategy) = Rank(ThisStrategy) + 0.5
+                                Ranks(ThisStrategy).Remove Key
+                                Ranks(ThisStrategy).Add Rank(ThisStrategy), Key
+                                Delta = Delta + 1
+                        End Select
+                    Next
+                End If
+                Records.MoveNext
+            Wend
+            Records.Close
         End If
+        
+        ' Retrieve the rank for the current strategy.
+        If Strategy = ApRankingStrategy.apOrdinal Then
+            ' Use both Value and SubValue.
+            Key = CStr(Nz(Value)) & KeySeparator & CStr(Nz(SubValue))
+        Else
+            ' Use Value only.
+            Key = CStr(Nz(Value))
+        End If
+        ' Will fail if key isn't present.
+        Rank(Strategy) = Ranks(Strategy).Item(Key)
     End If
     
-    ' Return the rank for this record.
-    RecordRank = Rank
-
+    RowRank = Rank(Strategy)
+    
+Exit_RowRank:
+    Exit Function
+    
+Err_RowRank:
+    Select Case Err
+        Case CannotAddKey
+            ' Key is present, thus cannot be added again.
+            Resume Next
+        Case CannotFindKey
+            ' Key is not present, thus cannot be removed.
+            Resume Next
+        Case Else
+            ' Some other error. Ignore.
+            Resume Exit_RowRank
+    End Select
+    
 End Function
-
