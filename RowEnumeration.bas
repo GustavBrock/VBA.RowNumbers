@@ -2,7 +2,7 @@ Attribute VB_Name = "RowEnumeration"
 Option Compare Database
 Option Explicit
 '
-' VBA.RowNumbers V1.4.1
+' VBA.RowNumbers V1.4.2
 ' (c) Gustav Brock, Cactus Data ApS, CPH
 ' https://github.com/GustavBrock/VBA.RowCount
 '
@@ -288,10 +288,15 @@ End Function
 ' Optionally, a grouping key can be passed to reset the row count
 ' for every group key.
 '
-' Usage (typical select query):
+' Usage (typical select query having an ID with an index):
 '   SELECT RowNumber(CStr([ID])) AS RowID, *
 '   FROM SomeTable
 '   WHERE (RowNumber(CStr([ID])) <> RowNumber("","",True));
+'
+' Usage (typical select query having an ID without an index):
+'   SELECT RowNumber(CStr([ID])) AS RowID, *
+'   FROM SomeTable
+'   WHERE (RowNumber("","",True)=0);
 '
 ' Usage (with group key):
 '   SELECT RowNumber(CStr([ID]), CStr[GroupID])) AS RowID, *
@@ -315,7 +320,7 @@ End Function
 '   FROM SomeTable
 '   WHERE (RowNumber("","",True)=0);
 '
-' 2018-08-23. Gustav Brock, Cactus Data ApS, CPH.
+' 2020-05-29. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Function RowNumber( _
     ByVal Key As String, _

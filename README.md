@@ -2,7 +2,7 @@
 
 ## Enumeration of Records and Rows in Queries and Forms in *Microsoft Access*
 
-Version 1.4.1
+Version 1.4.2
 
 *(c) Gustav Brock, Cactus Data ApS, CPH*
 
@@ -117,6 +117,8 @@ For this purpose, a query must be used to generate the numbers; if the numbers a
 >Must be implemented in a query to be useful.
 
 <br>
+
+![General](https://raw.githubusercontent.com/GustavBrock/VBA.RowNumbers/master/images/EE%20Rank.png)
 
 #### 5. Rank
 The principle of ranking is not difficult to understand, but one topic complicates matters: *Dupes*.<br>
