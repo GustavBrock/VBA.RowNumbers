@@ -140,7 +140,7 @@ The *RowRank* function supports these five strategies (methods):
 |------------------------------|-----------------------|--------------------------|
 | Standard competition ranking | "1224" ranking        | RANK.EQ                  |
 | Modified competition ranking | "1334" ranking        |                          |
-| Dense ranking                | "1233" ranking        |                          |
+| Dense ranking                | "1223" ranking        |                          |
 | Ordinal ranking              | "1234" ranking        |                          |
 | Fractional ranking           | "1 2.5 2.5 4" ranking | RANK.AVG                 |
 
