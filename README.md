@@ -215,3 +215,11 @@ Articles on the topic can be found here:
 * [Random Rows in Microsoft Access](https://www.experts-exchange.com/articles/33030/Random-Rows-in-Microsoft-Access.html)
 * [Sequential Rows in Microsoft Access](https://www.experts-exchange.com/articles/33069/Sequential-Rows-in-Microsoft-Access.html)
 * [Ranking Rows in Microsoft Access](https://www.experts-exchange.com/articles/33651/Ranking-rows-in-Microsoft-Access.html)
+
+<hr>
+
+*If you wish to support my work or need extended support or advice, feel free to:*
+
+<p>
+
+[<img src="https://raw.githubusercontent.com/GustavBrock/VBA.RowNumbers/master/images/BuyMeACoffee.png">](https://www.buymeacoffee.com/gustav/)
