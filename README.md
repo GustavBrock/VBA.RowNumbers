@@ -212,9 +212,9 @@ Articles on the topic can be found here:
 
 ![EE Logo](https://raw.githubusercontent.com/GustavBrock/VBA.RowNumbers/master/images/EE%20Logo.png)
 
-* [Random Rows in Microsoft Access](https://www.experts-exchange.com/articles/33030/Random-Rows-in-Microsoft-Access.html)
-* [Sequential Rows in Microsoft Access](https://www.experts-exchange.com/articles/33069/Sequential-Rows-in-Microsoft-Access.html)
-* [Ranking Rows in Microsoft Access](https://www.experts-exchange.com/articles/33651/Ranking-rows-in-Microsoft-Access.html)
+* [Random Rows in Microsoft Access](https://www.experts-exchange.com/articles/33030/Random-Rows-in-Microsoft-Access.html?preview=Efgy6lxk52s%3D)
+* [Sequential Rows in Microsoft Access](https://www.experts-exchange.com/articles/33069/Sequential-Rows-in-Microsoft-Access.html?preview=GaU3/YU%2BQm8%3D)
+* [Ranking Rows in Microsoft Access](https://www.experts-exchange.com/articles/33651/Ranking-rows-in-Microsoft-Access.html?preview=eULlQWUmBjc%3D)
 
 <hr>
 
@@ -222,4 +222,4 @@ Articles on the topic can be found here:
 
 <p>
 
-[<img src="https://raw.githubusercontent.com/GustavBrock/VBA.Timezone-Windows/master/images/BuyMeACoffee.png">](https://www.buymeacoffee.com/gustav/)
+[<img src="https://raw.githubusercontent.com/GustavBrock/VBA.RowNumbers/master/images/BuyMeACoffee.png">](https://www.buymeacoffee.com/gustav/)
