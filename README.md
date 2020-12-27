@@ -222,4 +222,4 @@ Articles on the topic can be found here:
 
 <p>
 
-[<img src="https://raw.githubusercontent.com/GustavBrock/VBA.RowNumbers/master/images/BuyMeACoffee.png">](https://www.buymeacoffee.com/gustav/)
+[<img src="https://raw.githubusercontent.com/GustavBrock/VBA.Timezone-Windows/master/images/BuyMeACoffee.png">](https://www.buymeacoffee.com/gustav/)
