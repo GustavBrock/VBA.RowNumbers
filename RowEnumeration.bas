@@ -2,7 +2,7 @@ Attribute VB_Name = "RowEnumeration"
 Option Compare Database
 Option Explicit
 '
-' VBA.RowNumbers V1.4.2
+' VBA.RowNumbers V1.4.3
 ' (c) Gustav Brock, Cactus Data ApS, CPH
 ' https://github.com/GustavBrock/VBA.RowCount
 '
@@ -439,7 +439,7 @@ End Function
 '           RowPriority Me.Priority, NameOfPrimaryKeyControl
 '       End Sub
 '
-' 2018-08-31. Gustav Brock, Cactus Data ApS, CPH.
+' 2022-03-12. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Sub RowPriority( _
     ByRef TextBox As Access.TextBox, _
@@ -519,6 +519,9 @@ Public Sub RowPriority( _
         End If
         Records.MoveNext
     Wend
+    
+    ' Set default value for a new record.
+    TextBox.DefaultValue = NewPriority + 1
     
     ' Reorder form and relocate record position.
     ' Will fail if more than one record is pasted in.
