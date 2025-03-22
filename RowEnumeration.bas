@@ -2,7 +2,7 @@ Attribute VB_Name = "RowEnumeration"
 Option Compare Database
 Option Explicit
 '
-' VBA.RowNumbers V1.4.3
+' VBA.RowNumbers V1.4.4
 ' (c) Gustav Brock, Cactus Data ApS, CPH
 ' https://github.com/GustavBrock/VBA.RowCount
 '
@@ -439,7 +439,7 @@ End Function
 '           RowPriority Me.Priority, NameOfPrimaryKeyControl
 '       End Sub
 '
-' 2022-03-12. Gustav Brock, Cactus Data ApS, CPH.
+' 2025-03-22. Gustav Brock, Cactus Data ApS, CPH.
 '
 Public Sub RowPriority( _
     ByRef TextBox As Access.TextBox, _
@@ -452,11 +452,13 @@ Public Sub RowPriority( _
     Dim Form                As Access.Form
     Dim Records             As DAO.Recordset
     
-    Dim RecordId            As Long
+    Dim RecordId            As Variant
+    Dim RecordIdType        As DAO.DataTypeEnum
     Dim NewPriority         As Long
     Dim PriorityFix         As Long
     Dim FieldName           As String
     Dim IdFieldName         As String
+    Dim NotEqual            As Boolean
     
     Dim Prompt              As String
     Dim Buttons             As VbMsgBoxStyle
@@ -486,6 +488,7 @@ Public Sub RowPriority( _
     
     ' Current Id and priority.
     RecordId = Form.Controls(IdControlName).Value
+    RecordIdType = Form.Recordset.Fields(Form.Controls(IdControlName).ControlSource).Type
     PriorityFix = Nz(TextBox.Value, 0)
     If PriorityFix <= 0 Then
         PriorityFix = 1
@@ -502,7 +505,12 @@ Public Sub RowPriority( _
     Set Records = Form.RecordsetClone
     Records.MoveFirst
     While Not Records.EOF
-        If Records.Fields(IdFieldName).Value <> RecordId Then
+        If RecordIdType = dbGUID Then
+            NotEqual = (StringFromGUID(Records.Fields(IdFieldName).Value) <> StringFromGUID(RecordId))
+        Else
+            NotEqual = (Records.Fields(IdFieldName).Value <> RecordId)
+        End If
+        If NotEqual Then
             NewPriority = NewPriority + 1
             If NewPriority = PriorityFix Then
                 ' Move this record to next lower priority.
@@ -527,9 +535,15 @@ Public Sub RowPriority( _
     ' Will fail if more than one record is pasted in.
     Form.Requery
     Set Records = Form.RecordsetClone
-    Records.FindFirst "[" & IdFieldName & "] = " & RecordId & ""
+    
+    Select Case RecordIdType
+        Case dbByte, dbInteger, dbLong, dbBigInt
+            Records.FindFirst "[" & IdFieldName & "] = " & RecordId & ""
+        Case dbGUID
+            Records.FindFirst "StringFromGUID([" & IdFieldName & "]) = " & StringFromGUID(RecordId) & ""
+    End Select
     Form.Bookmark = Records.Bookmark
-   
+
 PreExit_RowPriority:
     ' Enable a filter.
     Form.FilterOn = True
